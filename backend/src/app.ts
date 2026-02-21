@@ -3,6 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import excelRoutes from './routes/excelRoutes';
+import fs from 'fs';
+import path from 'path';
+
 
 dotenv.config();
 
@@ -16,6 +19,12 @@ app.use(express.json());
 
 // Rutas
 app.use('/api/excel', excelRoutes);
+
+const uploadDir = path.join(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+  console.log('Carpeta uploads creada');
+}
 
 // Manejo de errores
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

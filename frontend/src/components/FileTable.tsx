@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useFiles } from "@/context/FilesContext";
 import { formatRelativeDate, formatExactTime } from "@/utils/dateUtils";
@@ -14,6 +14,7 @@ import { ImportedFile } from "@/types/file";
 export default function FileTable() {
   const { files, removeFile, clearAll, addFile } = useFiles();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isCreatingTicket, setIsCreatingTicket] = useState(false); // 👈 nuevo estado
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
@@ -28,10 +29,12 @@ export default function FileTable() {
     (f) => selectedIds.includes(f.id) && f.type === "csv",
   );
   const canCreateTicket =
-    selectedExcel && selectedCsv && selectedIds.length === 2;
+    selectedExcel && selectedCsv && selectedIds.length === 2 && !isCreatingTicket; // 👈 añadimos condición
 
   const handleCreateTicket = async () => {
     if (!selectedExcel || !selectedCsv) return;
+
+    setIsCreatingTicket(true); // 👈 activamos estado de carga
 
     const formData = new FormData();
     formData.append(
@@ -84,6 +87,8 @@ export default function FileTable() {
       setSelectedIds([]);
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setIsCreatingTicket(false); // 👈 desactivamos estado de carga siempre
     }
   };
 
@@ -143,9 +148,10 @@ export default function FileTable() {
           {canCreateTicket && (
             <button
               onClick={handleCreateTicket}
-              className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md transition-colors"
+              disabled={isCreatingTicket} // 👈 deshabilitamos durante carga
+              className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Crear ticket de excel
+              {isCreatingTicket ? "Procesando..." : "Crear ticket de excel"}
             </button>
           )}
           <button

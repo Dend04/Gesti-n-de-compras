@@ -1,6 +1,7 @@
 import * as xlsx from 'xlsx';
 import { promises as fs } from 'fs';
 import Papa from 'papaparse';
+import { generateSinStockCsv } from './sinStockService';
 
 interface ExcelRow {
   codigo: string;
@@ -9,8 +10,11 @@ interface ExcelRow {
   precio: number;
 }
 
-export const processTicket = async (excelPath: string, csvPath: string): Promise<string> => {
-  // 1. Leer Excel
+export const processTicketAndSinStock = async (
+  excelPath: string,
+  csvPath: string
+): Promise<{ ticketCsv: string; sinStockCsv: string }> => {
+  // 1. Leer Excel (igual que antes)
   const excelWorkbook = xlsx.readFile(excelPath);
   const excelSheet = excelWorkbook.Sheets[excelWorkbook.SheetNames[0]];
   const excelData = xlsx.utils.sheet_to_json(excelSheet, { header: 1 }) as any[][];
@@ -52,17 +56,15 @@ export const processTicket = async (excelPath: string, csvPath: string): Promise
     }
   }
 
-  // 4. Combinar, filtrando productos que existen en CSV y tienen stock > 0
-  const resultado: any[] = [];
-
+  // 4. Generar CSV del ticket (productos válidos)
+  const ticketRows: any[] = [];
   for (const excelRow of excelRows) {
     const csvRow = csvMap.get(excelRow.codigo);
-    if (!csvRow) continue; // No existe en CSV, se omite
-
+    if (!csvRow) continue;
     const stock = parseFloat(csvRow['Stock disponible']);
-    if (isNaN(stock) || stock <= 0) continue; // Stock no numérico o <= 0, se omite
+    if (isNaN(stock) || stock <= 0) continue;
 
-    resultado.push({
+    ticketRows.push({
       'Almacén': csvRow['Almacén'] || '',
       'Código': csvRow.codigoLimpio || '',
       'Producto': csvRow['Producto'] || '',
@@ -79,9 +81,12 @@ export const processTicket = async (excelPath: string, csvPath: string): Promise
     });
   }
 
-  // 5. Generar CSV de salida
-  const outputPath = excelPath.replace(/\.xlsx?$/, '') + '_ticket.csv';
-  const outputCsv = Papa.unparse(resultado);
-  await fs.writeFile(outputPath, outputCsv, 'utf-8');
-  return outputPath;
+  // 5. Generar CSV de productos sin stock (usando la nueva función)
+  const sinStockCsv = generateSinStockCsv(excelRows, csvMap);
+
+  // 6. Retornar ambos CSV como strings
+  return {
+    ticketCsv: Papa.unparse(ticketRows),
+    sinStockCsv,
+  };
 };

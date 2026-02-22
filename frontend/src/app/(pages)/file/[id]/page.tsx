@@ -5,13 +5,24 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Papa from 'papaparse';
 import Link from 'next/link';
-import { ArrowLeftIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+
+interface ProductRow {
+  Almacén?: string;
+  Código: string;
+  Producto: string;
+  'Precio Venta'?: number | string;
+  'Cantidad Pedida'?: number | string;
+  'Stock disponible'?: number | string;
+  // ... otras columnas que puedan venir
+}
 
 export default function FilePage() {
   const { id } = useParams();
   const decodedId = decodeURIComponent(id as string);
   const { files } = useFiles();
-  const [data, setData] = useState<string[][]>([]);
+  const [data, setData] = useState<ProductRow[]>([]);
+  const [headers, setHeaders] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,8 +36,11 @@ export default function FilePage() {
     }
 
     Papa.parse(file.content, {
+      header: true,
+      skipEmptyLines: true,
       complete: (result) => {
-        setData(result.data as string[][]);
+        setHeaders(result.meta.fields || []);
+        setData(result.data as ProductRow[]);
         setLoading(false);
       },
       error: () => {
@@ -35,34 +49,6 @@ export default function FilePage() {
       },
     });
   }, [file]);
-
-  const handleDownloadFormatted = async () => {
-    if (!file || file.type !== 'excel creado') return;
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/excel/download-formatted`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          content: file.content, 
-          filename: file.name.replace(/\.csv$/, '') 
-        }),
-      });
-
-      if (!response.ok) throw new Error('Error al generar Excel');
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.name.replace(/\.csv$/, '.xlsx');
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      alert('Error al descargar el archivo formateado');
-    }
-  };
 
   if (loading) {
     return (
@@ -89,6 +75,22 @@ export default function FilePage() {
     );
   }
 
+  // Determinar qué columnas mostrar. Queremos mostrar las mismas que en el Excel: Código, Producto, Precio Venta, Un Caja (Cantidad Pedida), etc.
+  // Pero en el CSV generado por el backend, las columnas pueden tener nombres específicos. Supongamos que vienen con los nombres:
+  // 'Código', 'Producto', 'Precio Venta', 'Cantidad Pedida', 'Stock disponible', etc.
+  // Ajusta según los nombres reales.
+
+  // Para formatear números
+  const formatPrice = (price: any) => {
+    const num = parseFloat(price);
+    return isNaN(num) ? '' : num.toFixed(2);
+  };
+
+  const formatQuantity = (qty: any) => {
+    const num = parseInt(qty);
+    return isNaN(num) ? '' : num.toString();
+  };
+
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header minimalista */}
@@ -106,15 +108,6 @@ export default function FilePage() {
               <h1 className="text-lg font-medium text-gray-900 truncate">
                 {file.name}
               </h1>
-              {file.type === 'excel creado' && (
-                <button
-                  onClick={handleDownloadFormatted}
-                  className="text-gray-400 hover:text-green-600 transition-colors shrink-0"
-                  title="Descargar Excel con formato"
-                >
-                  <DocumentArrowDownIcon className="w-5 h-5" />
-                </button>
-              )}
             </div>
             <span className="text-sm text-gray-400 capitalize shrink-0 ml-4">
               {file.type}
@@ -123,27 +116,59 @@ export default function FilePage() {
         </div>
       </header>
 
-      {/* Contenido del CSV - ocupa el espacio restante */}
+      {/* Contenido del CSV con estilos tipo Excel */}
       <main className="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 h-full overflow-auto">
-          <div className="inline-block min-w-full align-middle">
-            <table className="min-w-full divide-y divide-gray-200">
-              <tbody className="bg-white font-mono text-sm">
-                {data.map((row, rowIndex) => (
-                  <tr key={rowIndex} className={rowIndex === 0 ? 'bg-gray-50' : 'hover:bg-gray-50'}>
-                    {row.map((cell, cellIndex) => (
-                      <td
-                        key={cellIndex}
-                        className="px-4 py-2 border-b border-gray-100 whitespace-nowrap"
-                      >
-                        {cell}
-                      </td>
-                    ))}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-auto">
+          <table className="min-w-full divide-y divide-gray-200" style={{ fontFamily: 'Aptos Narrow, sans-serif', fontSize: '11pt' }}>
+            <thead className="bg-gray-100">
+              <tr>
+                {/* Columna de selección? No, solo mostramos datos */}
+                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider bg-gray-100" style={{ fontWeight: 'bold' }}>
+                  Código
+                </th>
+                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider bg-gray-100" style={{ fontWeight: 'bold' }}>
+                  Producto
+                </th>
+                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider bg-gray-100" style={{ fontWeight: 'bold' }}>
+                  Precio Venta
+                </th>
+                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider bg-gray-100" style={{ fontWeight: 'bold' }}>
+                  Un Caja
+                </th>
+                <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase tracking-wider bg-gray-100" style={{ fontWeight: 'bold' }}>
+                  Stock
+                </th>
+                {/* Agrega más columnas si es necesario */}
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {data.map((row, index) => {
+                const stock = parseFloat(row['Stock disponible'] as string);
+                const isOutOfStock = stock === 0;
+                const rowClass = isOutOfStock ? 'bg-red-100' : '';
+
+                return (
+                  <tr key={index} className={`hover:bg-gray-50 ${rowClass}`}>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm" style={{ backgroundColor: '#C1F0C8' }}>
+                      {row['Código']}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm">
+                      {row['Producto']}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-right">
+                      {formatPrice(row['Precio Venta'])}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-right">
+                      {formatQuantity(row['Cantidad Pedida'])}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-right">
+                      {formatQuantity(stock)}
+                    </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </main>
     </div>

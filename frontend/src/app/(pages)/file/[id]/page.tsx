@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Papa from 'papaparse';
 import Link from 'next/link';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 
 export default function FilePage() {
   const { id } = useParams();
@@ -35,6 +35,34 @@ export default function FilePage() {
       },
     });
   }, [file]);
+
+  const handleDownloadFormatted = async () => {
+    if (!file || file.type !== 'excel creado') return;
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/excel/download-formatted`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          content: file.content, 
+          filename: file.name.replace(/\.csv$/, '') 
+        }),
+      });
+
+      if (!response.ok) throw new Error('Error al generar Excel');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name.replace(/\.csv$/, '.xlsx');
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      alert('Error al descargar el archivo formateado');
+    }
+  };
 
   if (loading) {
     return (
@@ -78,6 +106,15 @@ export default function FilePage() {
               <h1 className="text-lg font-medium text-gray-900 truncate">
                 {file.name}
               </h1>
+              {file.type === 'excel creado' && (
+                <button
+                  onClick={handleDownloadFormatted}
+                  className="text-gray-400 hover:text-green-600 transition-colors shrink-0"
+                  title="Descargar Excel con formato"
+                >
+                  <DocumentArrowDownIcon className="w-5 h-5" />
+                </button>
+              )}
             </div>
             <span className="text-sm text-gray-400 capitalize shrink-0 ml-4">
               {file.type}

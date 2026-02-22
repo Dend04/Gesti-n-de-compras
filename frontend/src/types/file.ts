@@ -1,7 +1,9 @@
+export type FileType = 'excel' | 'csv' | 'excel creado';
+
 export interface ImportedFile {
-  id: string;           // Identificador único (timestamp + nombre)
-  name: string;         // Nombre original del archivo
-  type: 'excel' | 'csv'; // Tipo detectado
-  content: string;      // Contenido CSV (para visualizar)
-  importedAt: number;   // Timestamp de importación
+  id: string;
+  name: string;
+  type: FileType;
+  content: string;
+  importedAt: number;
 }
